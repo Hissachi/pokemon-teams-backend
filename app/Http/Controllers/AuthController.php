@@ -65,28 +65,69 @@ class AuthController extends Controller
         ], 201);
     }
 
-    public function addPokemon(Request $request, Team $team): JsonResponse
+    public function addPokemon(Request $request, $teamId): JsonResponse
     {
         $request->validate([
-            'name' => 'required|string|max:20',
-            'type' => 'required|string|max:15',
-            'ability' => 'required|string|max:15',
-            'image' => 'required|string|max:120',
+            'name' => 'required|string|max:20', // Apenas o nome é obrigatório
         ]);
-
+    
+        $team = Team::where('user_id', auth()->id())->findOrFail($teamId);
+    
         if ($team->pokemons()->count() >= 5) {
             return response()->json([
                 'message' => 'Limite de 5 pokémons por time atingido'
             ], 422);
         }
-
-        $pokemon = $team->pokemons()->create($request->all());
-
+    
+        $pokemonData = $this->fetchPokemonData($request->name);
+        
+        if (!$pokemonData) {
+            return response()->json(['message' => 'Pokémon não encontrado na PokeAPI'], 404);
+        }
+    
+        $pokemon = $team->pokemons()->create([
+            'name' => $pokemonData['name'],
+            'type' => $pokemonData['type'],
+            'ability' => $pokemonData['ability'],
+            'image' => $pokemonData['image']
+        ]);
+    
         return response()->json([
             'message' => 'Pokémon adicionado com sucesso',
             'pokemon' => $pokemon,
             'remaining_slots' => 5 - $team->pokemons()->count()
         ], 201);
+    }
+    
+    private function fetchPokemonData($name)
+    {
+        $response = Http::withoutVerifying()
+            ->get("https://pokeapi.co/api/v2/pokemon/{$name}");
+        
+        if (!$response->successful()) {
+            return null;
+        }
+
+        $data = $response->json();
+
+        $type = isset($data['types'][0]['type']['name']) 
+            ? ucfirst($data['types'][0]['type']['name']) 
+            : 'Unknown';
+
+        $ability = isset($data['abilities'][0]['ability']['name']) 
+            ? ucfirst(str_replace('-', ' ', $data['abilities'][0]['ability']['name'])) 
+            : 'Unknown';
+
+        $image = $data['sprites']['other']['official-artwork']['front_default'] 
+            ?? $data['sprites']['front_default'] 
+            ?? null;
+
+        return [
+            'name' => ucfirst($name),
+            'type' => $type,
+            'ability' => $ability,
+            'image' => $image
+        ];
     }
 
     public function listTeams(): JsonResponse
@@ -98,6 +139,9 @@ class AuthController extends Controller
 
     public function deleteTeam(Team $team): JsonResponse
     {
+        if(!$team) {
+            return response()->json(['message' => 'Time não encontrado'], 404);
+        }
         $team->delete();
         return response()->json(['message' => 'Time removido com sucesso']);
     }
