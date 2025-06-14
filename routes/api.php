@@ -4,30 +4,22 @@ use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// Rotas públicas
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+Route::get('/characters', [AuthController::class, 'getApi']);
 
-
-Route::post('register',[AuthController::class,'register']);
-
-Route::post('/login',[AuthController::class,'login']);
-
-Route::get('/characters',[AuthController::class,'getApi']);
-
-
-//RESTRINGIR 5 PERSONAGENS POR TIME 
-
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
-
-
-
+// Rotas protegidas (requerem autenticação)
 Route::middleware('auth:sanctum')->group(function () {
+    // Rotas de usuário
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
-
-    Route::post('/teams', [AuthController::class, 'createTeams']);
-    Route::get('/teams', [AuthController::class, 'listTeams']);
-    Route::delete('/teams/{id}', [AuthController::class, 'deletarTeams']);
+    
+    // Rotas de times
+    Route::prefix('teams')->group(function () {
+        Route::post('/', [AuthController::class, 'createTeams']);
+        Route::get('/', [AuthController::class, 'listTeams']);
+        Route::delete('/{id}', [AuthController::class, 'deleteTeams']);
+    });
 });
-

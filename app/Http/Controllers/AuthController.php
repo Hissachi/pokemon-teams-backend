@@ -22,11 +22,11 @@ class AuthController extends Controller
     $user=User::where('email',operator: $request->email)->first();   
     if(!$user || !Hash::check($request->password, $user->password))
     {
-        return response()->json(['message' =>'The Provided credentials are incorrect'],	401);
+        return response()->json(['message' =>'As credenciais fornecidas estão incorretas.'],	401);
     }
     $token=$user->createToken($user->name . 'Auth_Token')->plainTextToken;
     
-    return response()->json(['message'=> 'Login Sucessful','token_type'=>'Bearer','token'=> $token],200);
+    return response()->json(['message'=> 'Login feito com sucesso!','token_type'=>'Bearer','token'=> $token],200);
 }
 
 public function register(Request $request):JsonResponse
@@ -44,12 +44,12 @@ $user = User::create([
 ]);
 
 if(!$user){
-    return response()->json(['message'=> 'Somethin when wrong!!'],500);
+    return response()->json(['message'=> 'Falha ao cadastrar usuário.'],500);
 }
 
 $token=$user->createToken($user->name . 'Auth_Token')->plainTextToken;
 
-return response()->json(['message'=> 'Login Sucessful','token_type'=>'Bearer','token'=> $token],200);
+return response()->json(['message'=> 'Conta cadastrada com sucesso!','token_type'=>'Bearer','token'=> $token],200);
 }
 
 public function getApi()
