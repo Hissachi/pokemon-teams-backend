@@ -18,8 +18,10 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Rotas de times
     Route::prefix('teams')->group(function () {
-        Route::post('/', [AuthController::class, 'createTeams']);
+        Route::post('/', [AuthController::class, 'createTeam']);
         Route::get('/', [AuthController::class, 'listTeams']);
-        Route::delete('/{id}', [AuthController::class, 'deleteTeams']);
+        Route::delete('/{team}', [AuthController::class, 'deleteTeam']);
+        Route::post('/{team}/pokemons', [AuthController::class, 'addPokemon']);
+        Route::delete('/{team}/pokemons/{pokemon}', [AuthController::class, 'deletePokemon']);
     });
 });

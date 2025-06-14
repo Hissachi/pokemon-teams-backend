@@ -3,21 +3,19 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Pokemon extends Model
 {
-    protected $table = 'teams';
     protected $fillable = [
-        'user_id',
+        'team_id',
         'name',
         'type',
-        'ability',        
-        'image',
+        'ability',
+        'image'
     ];
 
-    public function user(): BelongsTo
+    public function team()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Team::class);
     }
 }

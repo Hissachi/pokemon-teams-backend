@@ -2,127 +2,118 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Pokemon;
-use App\Models\User;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
-
+use App\Models\{Pokemon, Team, User};
+use Illuminate\Http\{JsonResponse, Request};
+use Illuminate\Support\Facades\{Hash, Http};
 
 class AuthController extends Controller
 {
-    public function login(Request $request):JsonResponse
+    public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email' =>['required','email', 'max:200'],
-            'password'=>['required','string','max:8'],
-]);
+            'email' => 'required|email|max:200',
+            'password' => 'required|string|min:5',
+        ]);
 
-    $user=User::where('email',operator: $request->email)->first();   
-    if(!$user || !Hash::check($request->password, $user->password))
-    {
-        return response()->json(['message' =>'As credenciais fornecidas estão incorretas.'],	401);
-    }
-    $token=$user->createToken($user->name . 'Auth_Token')->plainTextToken;
-    
-    return response()->json(['message'=> 'Login feito com sucesso!','token_type'=>'Bearer','token'=> $token],200);
-}
+        $user = User::where('email', $request->email)->first();
+        
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json(['message' => 'Credenciais inválidas'], 401);
+        }
 
-public function register(Request $request):JsonResponse
-{
-    $request->validate([
-        'name'=> ['required','string','max:20'],
-        'email' =>['required','email', 'max:200','unique:users,email'],
-        'password'=>['required','string','max:8'],
-]);
-
-$user = User::create([
-    'name'=> $request->name,
-    'email'=> $request->email, 
-    'password'=> Hash::make($request->password),  
-]);
-
-if(!$user){
-    return response()->json(['message'=> 'Falha ao cadastrar usuário.'],500);
-}
-
-$token=$user->createToken($user->name . 'Auth_Token')->plainTextToken;
-
-return response()->json(['message'=> 'Conta cadastrada com sucesso!','token_type'=>'Bearer','token'=> $token],200);
-}
-
-public function getApi()
-{
-    $response = Http::withoutVerifying()->get('https://pokeapi.co/api/v2/');
-
-    if($response->successful())
-    {
-        $dados = $response-> json();
-        return response()->json($dados);
-    } 
-    else{
-        return response() -> json(['erro => Não foi possivel'],500);
-    }
-}
-
-public function createTeams(Request $request):JsonResponse
-{
-    $request->validate([
-        'name'=> ['required','string','max:20'],
-        'type' =>['required','string', 'max:15'],
-        'ability' => ['required','string','max:15'],
-        'image'=>['required','string','max:120'],
-]);
-
-$pokemonCount = Pokemon::where('user_id', auth()->id())->count();
-    if ($pokemonCount >= 5) {
+        $token = $user->createToken($user->name.'_Token')->plainTextToken;
+        
         return response()->json([
-            'message' => 'Você já tem o limite máximo de 5 pokémons no seu time'
-        ], 422);
+            'message' => 'Login realizado com sucesso',
+            'token' => $token,
+            'token_type' => 'Bearer'
+        ]);
     }
 
-    $pokemon = Pokemon::create([
-        'user_id' => auth()->id(), 
-        'name' => $request->name,
-        'type' => $request->type, 
-        'ability' => $request->ability,
-        'image' => $request->image
-    ]);
+    public function register(Request $request): JsonResponse
+    {
+        $request->validate([
+            'name' => 'required|string|max:50',
+            'email' => 'required|email|max:200|unique:users',
+            'password' => 'required|string|min:5|confirmed',
+        ]);
 
-    if (!$pokemon) {
-        return response()->json(['message' => 'Something went wrong!!'], 500);
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ]);
+
+        $token = $user->createToken($user->name.'_Token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Usuário registrado com sucesso',
+            'token' => $token,
+            'token_type' => 'Bearer'
+        ], 201);
     }
 
-    return response()->json([
-        'message' => 'Pokémon added to your team successfully',
-        'remaining_slots' => 5 - ($pokemonCount + 1)
-    ], 201);
+    public function createTeam(Request $request): JsonResponse
+    {
+        $request->validate(['name' => 'required|string|max:50']);
+        
+        $team = auth()->user()->teams()->create($request->only('name'));
+        
+        return response()->json([
+            'message' => 'Time criado com sucesso',
+            'team' => $team
+        ], 201);
+    }
+
+    public function addPokemon(Request $request, Team $team): JsonResponse
+    {
+        $request->validate([
+            'name' => 'required|string|max:20',
+            'type' => 'required|string|max:15',
+            'ability' => 'required|string|max:15',
+            'image' => 'required|string|max:120',
+        ]);
+
+        if ($team->pokemons()->count() >= 5) {
+            return response()->json([
+                'message' => 'Limite de 5 pokémons por time atingido'
+            ], 422);
+        }
+
+        $pokemon = $team->pokemons()->create($request->all());
+
+        return response()->json([
+            'message' => 'Pokémon adicionado com sucesso',
+            'pokemon' => $pokemon,
+            'remaining_slots' => 5 - $team->pokemons()->count()
+        ], 201);
+    }
+
+    public function listTeams(): JsonResponse
+    {
+        return response()->json([
+            'teams' => auth()->user()->teams()->with('pokemons')->get()
+        ]);
+    }
+
+    public function deleteTeam(Team $team): JsonResponse
+    {
+        $team->delete();
+        return response()->json(['message' => 'Time removido com sucesso']);
+    }
+
+    public function deletePokemon(Team $team, Pokemon $pokemon): JsonResponse
+    {
+        $pokemon->delete();
+        return response()->json(['message' => 'Pokémon removido com sucesso']);
+    }
+
+    public function getApi(): JsonResponse
+    {
+        $response = Http::withoutVerifying()->get('https://pokeapi.co/api/v2/');
+        
+        return $response->successful()
+            ? response()->json($response->json())
+            : response()->json(['error' => 'Falha ao acessar a PokeAPI'], 500);
+    }
 }
-
-public function listTeams()
-{
-    $team = Pokemon::where('user_id', auth()->id())
-                 ->latest()
-                 ->take(5)
-                 ->get();
-
-    return response()->json([
-        'team' => $team,
-        'count' => $team->count()
-    ]);
-}
-
-public function deleteTeams($id)
-{
-    $pokemon = Pokemon::where('user_id', auth()->id())
-                     ->findOrFail($id);
-    
-    $pokemon->delete();
-    
-    return response()->json(['message' => 'Pokémon released']);
-}
-
-
-}
-
